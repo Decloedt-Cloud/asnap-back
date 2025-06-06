@@ -308,13 +308,12 @@ def send_email_to_user(user_email: str, file_name: str, analysis: 'InsuranceAnal
         rows = []
         for result in analysis.categories:
             color_class = result.color.lower()
-            icon = "✓" if result.color.upper() == "VERT" else "⚠" if result.color.upper() == "ORANGE" else "✗"
             rows.append(f'''
                 <tr style="border-bottom: 1px solid #f0f0f0;">
-                    <td style="padding: 15px 20px; font-weight: 500; color: #2c3e50;">{result.name}</td>
-                    <td style="padding: 15px 20px; text-align: center;">
-                        <span class="{color_class}" style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 20px; font-weight: 600; font-size: 14px;">
-                            {icon} {result.color.upper()}
+                    <td style="padding: 15px 20px; font-weight: 500; color: #2c3e50; vertical-align: middle;">{result.name}</td>
+                    <td style="padding: 15px 20px; text-align: center; vertical-align: middle;">
+                        <span class="{color_class}" style="display: inline-block; padding: 8px 16px; border-radius: 20px; font-weight: 600; font-size: 14px;">
+                            {result.color.upper()}
                         </span>
                     </td>
                 </tr>
@@ -450,6 +449,11 @@ def send_email_to_user(user_email: str, file_name: str, analysis: 'InsuranceAnal
             font-size: 14px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            vertical-align: middle;
+        }}
+
+        .results-table th:last-child {{
+            text-align: center;
         }}
 
         .vert {{
@@ -637,13 +641,12 @@ def send_email_to_admin(user_email: str, phone: str, file_name: str, analysis: '
         rows = []
         for result in analysis.categories:
             color_class = result.color.lower()
-            icon = "✓" if result.color.upper() == "VERT" else "⚠" if result.color.upper() == "ORANGE" else "✗"
             rows.append(f'''
                 <tr style="border-bottom: 1px solid #f0f0f0;">
-                    <td style="padding: 12px 15px; font-weight: 500; color: #2c3e50;">{result.name}</td>
-                    <td style="padding: 12px 15px; text-align: center;">
-                        <span class="{color_class}" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 15px; font-weight: 600; font-size: 12px;">
-                            {icon} {result.color.upper()}
+                    <td style="padding: 12px 15px; font-weight: 500; color: #2c3e50; vertical-align: middle;">{result.name}</td>
+                    <td style="padding: 12px 15px; text-align: center; vertical-align: middle;">
+                        <span class="{color_class}" style="display: inline-block; padding: 6px 12px; border-radius: 15px; font-weight: 600; font-size: 12px;">
+                            {result.color.upper()}
                         </span>
                     </td>
                 </tr>
@@ -770,6 +773,11 @@ def send_email_to_admin(user_email: str, phone: str, file_name: str, analysis: '
             color: #495057;
             font-size: 13px;
             text-transform: uppercase;
+            vertical-align: middle;
+        }}
+
+        .results-table th:last-child {{
+            text-align: center;
         }}
 
         .vert {{
