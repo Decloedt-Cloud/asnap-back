@@ -299,7 +299,7 @@ def extract_text_with_qwen(pdf_bytes: bytes) -> Dict:
 
 
 # API endpoint: Analyze PDF and generate benchmark report
-@app.post("/upload/")
+@app.post("/api/upload/")
 async def upload_pdf(
         file: UploadFile = File(...),
         email: str = Form(...),
@@ -485,7 +485,7 @@ def send_email_to_admin(user_email: str, phone: str, file_name: str, analysis: '
 
 
 # API endpoint: Analyze PDF and generate benchmark report
-@app.post("/upload/")
+@app.post("/api/upload/")
 async def upload_pdf(
         file: UploadFile = File(...),
         email: str = Form(...),
