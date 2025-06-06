@@ -332,6 +332,52 @@ def send_email_to_user(user_email: str, file_name: str, analysis: 'InsuranceAnal
         .vert {{ color: #28a745; font-weight: bold; }}
         .orange {{ color: #ffc107; font-weight: bold; }}
         .rouge {{ color: #dc3545; font-weight: bold; }}
+          .rectifier-btn {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 18px 35px;
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+            color: white;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 1.2em;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(255, 107, 107, 0.3);
+            position: relative;
+            overflow: hidden;
+        }}
+
+        .rectifier-btn::before {{
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: left 0.6s;
+        }}
+
+        .rectifier-btn:hover::before {{
+            left: 100%;
+        }}
+        .rectifier-btn:hover {{
+            transform: translateY(-3px);
+            box-shadow: 0 6px 25px rgba(255, 107, 107, 0.4);
+        }}
+
+        .rectifier-btn:active {{
+            transform: translateY(-1px);
+        }}
+
+        .icon {{
+            width: 22px;
+            height: 22px;
+            fill: currentColor;
+        }}
     </style>
 </head>
 <body>
@@ -344,7 +390,12 @@ def send_email_to_user(user_email: str, file_name: str, analysis: 'InsuranceAnal
             <tr><th>Catégorie</th><th>Évaluation</th></tr>
             {rows_html}
         </table>
-
+   <a href="https://83.228.199.223/upload-pdf" class="rectifier-btn">
+        <svg class="icon" viewBox="0 0 24 24">
+            <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+        </svg>
+        Rectifier les résultats
+    </a>
         <p>Cordialement,<br>ASNAP - Votre sérénité, en un clic<br>Museumstrasse 1, 8021 Zürich<br>Informations : info@asnap.ch | Service client : clients@asnap.ch</p>
     </div>
     
@@ -394,6 +445,8 @@ def send_email_to_admin(user_email: str, phone: str, file_name: str, analysis: '
         .vert {{ color: #28a745; font-weight: bold; }}
         .orange {{ color: #ffc107; font-weight: bold; }}
         .rouge {{ color: #dc3545; font-weight: bold; }}
+        
+      
     </style>
 </head>
 <body>
