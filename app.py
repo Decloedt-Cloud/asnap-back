@@ -406,6 +406,7 @@ def send_email_to_user(user_email: str, file_name: str, analysis: 'InsuranceAnal
         <p><a href="https://83.228.199.223/upload-pdf">Rectifier les résultats</a></p>
         <p>Cordialement,<br>ASNAP - Votre sérénité, en un clic<br>Museumstrasse 1, 8021 Zürich<br>Informations : info@asnap.ch | Service client : clients@asnap.ch</p>
     </div>
+    
 </body>
 </html>
 """
