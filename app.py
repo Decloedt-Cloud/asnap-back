@@ -308,7 +308,17 @@ def send_email_to_user(user_email: str, file_name: str, analysis: 'InsuranceAnal
         rows = []
         for result in analysis.categories:
             color_class = result.color.lower()
-            rows.append(f'<tr><td>{result.name}</td><td class="{color_class}">● {result.color.upper()}</td></tr>')
+            icon = "✓" if result.color.upper() == "VERT" else "⚠" if result.color.upper() == "ORANGE" else "✗"
+            rows.append(f'''
+                <tr style="border-bottom: 1px solid #f0f0f0;">
+                    <td style="padding: 15px 20px; font-weight: 500; color: #2c3e50;">{result.name}</td>
+                    <td style="padding: 15px 20px; text-align: center;">
+                        <span class="{color_class}" style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 20px; font-weight: 600; font-size: 14px;">
+                            {icon} {result.color.upper()}
+                        </span>
+                    </td>
+                </tr>
+            ''')
 
         rows_html = "".join(rows)
 
@@ -316,89 +326,296 @@ def send_email_to_user(user_email: str, file_name: str, analysis: 'InsuranceAnal
         msg = EmailMessage()
         msg["From"] = SMTP_EMAIL
         msg["To"] = user_email
-        msg["Subject"] = "Résultat de votre analyse d'assurance 🏅"
+        msg["Subject"] = "✨ Votre analyse d'assurance est prête"
 
         html_content = f"""<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body {{ font-family: Arial, sans-serif; background-color: #f5f5f5; padding: 20px; text-align: center; }}
-        .container {{ max-width: 600px; background: #ffffff; padding: 20px; border-radius: 10px; margin: auto; text-align: left; }}
-        h1 {{ color: #333; font-size: 20px; }}
-        h2 {{ color: #ffcc00; font-size: 22px; text-align: center; }}
-        table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
-        th, td {{ padding: 10px; border: 1px solid #ddd; text-align: left; }}
-        .vert {{ color: #28a745; font-weight: bold; }}
-        .orange {{ color: #ffc107; font-weight: bold; }}
-        .rouge {{ color: #dc3545; font-weight: bold; }}
-          .rectifier-btn {{
+        * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }}
+
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px;
+            line-height: 1.6;
+        }}
+
+        .email-container {{
+            max-width: 650px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }}
+
+        .header {{
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 30px;
+            text-align: center;
+            color: white;
+            position: relative;
+        }}
+
+        .header::before {{
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 20"><defs><pattern id="grain" width="100" height="20" patternUnits="userSpaceOnUse"><circle cx="10" cy="10" r="0.5" fill="white" opacity="0.1"/><circle cx="30" cy="5" r="0.3" fill="white" opacity="0.1"/><circle cx="50" cy="15" r="0.4" fill="white" opacity="0.1"/><circle cx="70" cy="8" r="0.2" fill="white" opacity="0.1"/><circle cx="90" cy="12" r="0.3" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="20" fill="url(%23grain)"/></svg>');
+        }}
+
+        .logo {{
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+        }}
+
+        .tagline {{
+            font-size: 16px;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }}
+
+        .content {{
+            padding: 40px 30px;
+        }}
+
+        .greeting {{
+            font-size: 24px;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }}
+
+        .intro-text {{
+            color: #5a6c7d;
+            font-size: 16px;
+            margin-bottom: 30px;
+            line-height: 1.8;
+        }}
+
+        .result-badge {{
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: linear-gradient(45deg, #ffd700, #ffed4a);
+            color: #8b5a00;
+            padding: 15px 25px;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 18px;
+            margin: 20px 0;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+        }}
+
+        .section-title {{
+            color: #2c3e50;
+            font-size: 20px;
+            font-weight: 600;
+            margin: 30px 0 20px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }}
+
+        .results-table {{
+            width: 100%;
+            border-collapse: collapse;
+            background: #ffffff;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            margin-bottom: 30px;
+        }}
+
+        .results-table th {{
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            padding: 20px;
+            text-align: left;
+            font-weight: 600;
+            color: #495057;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }}
+
+        .vert {{
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+        }}
+
+        .orange {{
+            background: linear-gradient(135deg, #ffc107, #fd7e14);
+            color: white;
+        }}
+
+        .rouge {{
+            background: linear-gradient(135deg, #dc3545, #e83e8c);
+            color: white;
+        }}
+
+        .rectifier-section {{
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            margin: 30px 0;
+        }}
+
+        .rectifier-title {{
+            color: #2c3e50;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }}
+
+        .rectifier-description {{
+            color: #6c757d;
+            margin-bottom: 25px;
+            font-size: 14px;
+        }}
+
+        .rectifier-btn {{
             display: inline-flex;
             align-items: center;
             justify-content: center;
             gap: 12px;
-            padding: 18px 35px;
+            padding: 15px 30px;
             background: linear-gradient(45deg, #ff6b6b, #ee5a52);
             color: white;
             text-decoration: none;
             border-radius: 50px;
             font-weight: 600;
-            font-size: 1.2em;
+            font-size: 16px;
             transition: all 0.3s ease;
             box-shadow: 0 4px 20px rgba(255, 107, 107, 0.3);
-            position: relative;
-            overflow: hidden;
         }}
 
-        .rectifier-btn::before {{
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-            transition: left 0.6s;
-        }}
-
-        .rectifier-btn:hover::before {{
-            left: 100%;
-        }}
         .rectifier-btn:hover {{
-            transform: translateY(-3px);
+            transform: translateY(-2px);
             box-shadow: 0 6px 25px rgba(255, 107, 107, 0.4);
         }}
 
-        .rectifier-btn:active {{
-            transform: translateY(-1px);
+        .footer {{
+            background: #2c3e50;
+            color: white;
+            padding: 30px;
+            text-align: center;
         }}
 
-        .icon {{
-            width: 22px;
-            height: 22px;
-            fill: currentColor;
+        .footer-content {{
+            margin-bottom: 20px;
+        }}
+
+        .contact-info {{
+            font-size: 14px;
+            opacity: 0.8;
+            line-height: 1.8;
+        }}
+
+        .contact-info a {{
+            color: #3498db;
+            text-decoration: none;
+        }}
+
+        @media (max-width: 600px) {{
+            .email-container {{
+                margin: 10px;
+                border-radius: 15px;
+            }}
+
+            .header, .content, .footer {{
+                padding: 25px 20px;
+            }}
+
+            .greeting {{
+                font-size: 20px;
+            }}
+
+            .results-table th, .results-table td {{
+                padding: 12px 10px;
+                font-size: 14px;
+            }}
         }}
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Bonjour,</h1>
-        <p>Voici le résultat de votre benchmark pour {file_name} :</p>
-        <p><strong>🏅 Niveau de couverture :</strong> {analysis.overall_medal}</p>
-        <h2>📊 Résumé</h2>
-        <table>
-            <tr><th>Catégorie</th><th>Évaluation</th></tr>
-            {rows_html}
-        </table>
-   <a href="https://83.228.199.223/upload-pdf" class="rectifier-btn">
-        <svg class="icon" viewBox="0 0 24 24">
-            <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
-        </svg>
-        Rectifier les résultats
-    </a>
-        <p>Cordialement,<br>ASNAP - Votre sérénité, en un clic<br>Museumstrasse 1, 8021 Zürich<br>Informations : info@asnap.ch | Service client : clients@asnap.ch</p>
+    <div class="email-container">
+        <div class="header">
+            <div class="logo">ASNAP</div>
+            <div class="tagline">Votre sérénité, en un clic</div>
+        </div>
+
+        <div class="content">
+            <div class="greeting">Bonjour ! 👋</div>
+
+            <p class="intro-text">
+                Nous avons terminé l'analyse de votre police d'assurance <strong>{file_name}</strong>. 
+                Voici un résumé détaillé de votre couverture actuelle.
+            </p>
+
+            <div class="result-badge">
+                🏅 Niveau de couverture : {analysis.overall_medal}
+            </div>
+
+            <div class="section-title">
+                📊 Détail par catégorie
+            </div>
+
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>Catégorie de couverture</th>
+                        <th style="text-align: center;">Évaluation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows_html}
+                </tbody>
+            </table>
+
+            <div class="rectifier-section">
+                <div class="rectifier-title">Des questions sur ces résultats ?</div>
+                <div class="rectifier-description">
+                    Si vous pensez qu'il y a une erreur dans l'analyse ou souhaitez apporter des précisions, 
+                    vous pouvez soumettre une correction.
+                </div>
+                <a href="https://83.228.199.223/upload-pdf" class="rectifier-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                    </svg>
+                    Rectifier les résultats
+                </a>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="footer-content">
+                <div style="font-size: 18px; font-weight: 600; margin-bottom: 15px;">ASNAP</div>
+                <div style="margin-bottom: 15px; font-size: 14px; opacity: 0.9;">
+                    Votre partenaire de confiance pour l'assurance
+                </div>
+            </div>
+            <div class="contact-info">
+                📍 Museumstrasse 1, 8021 Zürich<br>
+                📧 <a href="mailto:info@asnap.ch">info@asnap.ch</a> | 
+                🎧 <a href="mailto:clients@asnap.ch">clients@asnap.ch</a>
+            </div>
+        </div>
     </div>
-    
 </body>
 </html>
 """
@@ -415,13 +632,22 @@ def send_email_to_user(user_email: str, file_name: str, analysis: 'InsuranceAnal
         raise HTTPException(status_code=500, detail=f"Erreur envoi email utilisateur : {e}")
 
 
-# Send email to the administrator
 def send_email_to_admin(user_email: str, phone: str, file_name: str, analysis: 'InsuranceAnalysis'):
     try:
         rows = []
         for result in analysis.categories:
             color_class = result.color.lower()
-            rows.append(f'<tr><td>{result.name}</td><td class="{color_class}">● {result.color.upper()}</td></tr>')
+            icon = "✓" if result.color.upper() == "VERT" else "⚠" if result.color.upper() == "ORANGE" else "✗"
+            rows.append(f'''
+                <tr style="border-bottom: 1px solid #f0f0f0;">
+                    <td style="padding: 12px 15px; font-weight: 500; color: #2c3e50;">{result.name}</td>
+                    <td style="padding: 12px 15px; text-align: center;">
+                        <span class="{color_class}" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 15px; font-weight: 600; font-size: 12px;">
+                            {icon} {result.color.upper()}
+                        </span>
+                    </td>
+                </tr>
+            ''')
 
         rows_html = "".join(rows)
 
@@ -429,39 +655,199 @@ def send_email_to_admin(user_email: str, phone: str, file_name: str, analysis: '
         msg = EmailMessage()
         msg["From"] = SMTP_EMAIL
         msg["To"] = "proiadev@gmail.com"
-        msg["Subject"] = "Nouveau benchmark effectué – Infos visiteur 📊"
+        msg["Subject"] = "🔔 Nouveau benchmark ASNAP"
 
         html_content = f"""<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body {{ font-family: Arial, sans-serif; background-color: #f5f5f5; padding: 20px; text-align: center; }}
-        .container {{ max-width: 600px; background: #ffffff; padding: 20px; border-radius: 10px; margin: auto; text-align: left; }}
-        h1 {{ color: #333; font-size: 20px; }}
-        h2 {{ color: #ffcc00; font-size: 22px; text-align: center; }}
-        table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
-        th, td {{ padding: 10px; border: 1px solid #ddd; text-align: left; }}
-        .vert {{ color: #28a745; font-weight: bold; }}
-        .orange {{ color: #ffc107; font-weight: bold; }}
-        .rouge {{ color: #dc3545; font-weight: bold; }}
-        
-      
+        * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }}
+
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            line-height: 1.6;
+        }}
+
+        .email-container {{
+            max-width: 600px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+        }}
+
+        .admin-header {{
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            padding: 25px;
+            color: white;
+            text-align: center;
+        }}
+
+        .admin-header h1 {{
+            font-size: 24px;
+            margin-bottom: 5px;
+        }}
+
+        .admin-header .subtitle {{
+            opacity: 0.8;
+            font-size: 14px;
+        }}
+
+        .content {{
+            padding: 30px 25px;
+        }}
+
+        .user-info {{
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+        }}
+
+        .user-info h3 {{
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }}
+
+        .info-row {{
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }}
+
+        .info-label {{
+            font-weight: 600;
+            color: #495057;
+        }}
+
+        .info-value {{
+            color: #6c757d;
+        }}
+
+        .result-summary {{
+            background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            text-align: center;
+        }}
+
+        .result-badge {{
+            display: inline-block;
+            background: linear-gradient(45deg, #ffd700, #ffed4a);
+            color: #8b5a00;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: 700;
+            font-size: 16px;
+        }}
+
+        .results-table {{
+            width: 100%;
+            border-collapse: collapse;
+            background: #ffffff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }}
+
+        .results-table th {{
+            background: #f8f9fa;
+            padding: 12px 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #495057;
+            font-size: 13px;
+            text-transform: uppercase;
+        }}
+
+        .vert {{
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+        }}
+
+        .orange {{
+            background: linear-gradient(135deg, #ffc107, #fd7e14);
+            color: white;
+        }}
+
+        .rouge {{
+            background: linear-gradient(135deg, #dc3545, #e83e8c);
+            color: white;
+        }}
+
+        .footer {{
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            color: #6c757d;
+            font-size: 12px;
+        }}
+
+        .timestamp {{
+            color: #adb5bd;
+            font-style: italic;
+            margin-top: 10px;
+        }}
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Bonjour,</h1>
-        <p>Nouveau benchmark pour {file_name} :</p>
-        <p><strong>📧 Email :</strong> {user_email}<br><strong>📞 Téléphone :</strong> {phone}</p>
-        <p><strong>🏅 Résultat :</strong> {analysis.overall_medal}</p>
-        <h2>📊 Détails</h2>
-        <table>
-            <tr><th>Catégorie</th><th>Évaluation</th></tr>
-            {rows_html}
-        </table>
-     
-        <p>Cordialement,<br>ASNAP - Votre sérénité, en un clic<br>Museumstrasse 1, 8021 Zürich<br>Informations : info@asnap.ch | Service client : clients@asnap.ch</p>
+    <div class="email-container">
+        <div class="admin-header">
+            <h1>🔔 Nouveau Benchmark</h1>
+            <div class="subtitle">Administration ASNAP</div>
+        </div>
+
+        <div class="content">
+            <div class="user-info">
+                <h3>👤 Informations Utilisateur</h3>
+                <div class="info-row">
+                    <span class="info-label">📧 Email :</span>
+                    <span class="info-value">{user_email}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">📞 Téléphone :</span>
+                    <span class="info-value">{phone}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">📄 Fichier :</span>
+                    <span class="info-value">{file_name}</span>
+                </div>
+            </div>
+
+            <div class="result-summary">
+                <div style="color: #2c3e50; font-weight: 600; margin-bottom: 10px;">Résultat Global</div>
+                <div class="result-badge">🏅 {analysis.overall_medal}</div>
+            </div>
+
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>Catégorie</th>
+                        <th style="text-align: center;">Évaluation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows_html}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="footer">
+            <div>ASNAP Administration Panel</div>
+            <div class="timestamp">Email généré automatiquement</div>
+        </div>
     </div>
 </body>
 </html>
