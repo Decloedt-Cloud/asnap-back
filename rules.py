@@ -9,6 +9,7 @@ from typing import Dict, Optional
 logger = logging.getLogger(__name__)
 
 TARIF_REFERENCE_SEANCE = 120
+TARIF_NUITEE = 1500
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("assurance-rules")
@@ -98,33 +99,50 @@ class InsuranceAnalyzer:
                               {"etendue": etendue, "plafond": plafond, "franchise": franchise})
 
     def analyze_hospitalisation(self, data: Dict) -> CategoryResult:
-        """Analyse la catégorie Hospitalisation."""
-        type_prestation = data.get("type", "commune")
-        etendue = data.get("etendue", 0)  # % ou CHF/jour
-        franchise = data.get("franchise", 0)  # CHF
+        """Analyse la catégorie Hospitalisation, avec gestion des cas particuliers (ex. franchise volontaire chez KPT)."""
 
-        # Si étendue est en CHF/jour, convertir en pourcentage (1 nuit = CHF 1500)
-        if etendue > 100:  # Supposer que c'est un montant si > 100
-            etendue_percent = (etendue / 1500) * 100
+        type_prestation = data.get("type", "commune").lower()
+        etendue = data.get("etendue", 0)
+        franchise = data.get("franchise", 0)
+        compagnie = data.get("compagnie", "").lower()
+        franchise_volontaire = data.get("franchise_volontaire", False)
+
+        # Conversion CHF/jour → %
+        if etendue > 100:
+            etendue_percent = (etendue / TARIF_NUITEE) * 100
         else:
             etendue_percent = etendue
 
         logger.info(
-            f"Hospitalisation - Type: {type_prestation}, Étendue: {etendue} ({etendue_percent}%), Franchise: {franchise} CHF")
+            f"Hospitalisation - Compagnie: {compagnie}, Type: {type_prestation}, Étendue: {etendue} ({etendue_percent}%), Franchise: {franchise} CHF")
 
-        # Gold (Vert): Privé, Étendue <= 0% (couverture complète), Franchise = 0
+        # ✅ Cas particulier : KPT + franchise volontaire → considérer comme ORANGE au minimum
+        if compagnie == "kpt" and franchise_volontaire:
+            if type_prestation == "privé" and etendue_percent <= 0:
+                return CategoryResult("Hospitalisation", "Vert",
+                                      {"cas_particulier": "KPT + franchise volontaire",
+                                       "type": type_prestation, "etendue_percent": etendue_percent,
+                                       "franchise": franchise})
+            elif type_prestation == "semi-privé" and etendue_percent <= 10:
+                return CategoryResult("Hospitalisation", "Orange",
+                                      {"cas_particulier": "KPT + franchise volontaire",
+                                       "type": type_prestation, "etendue_percent": etendue_percent,
+                                       "franchise": franchise})
+
+        # 💚 Couverture complète
         if type_prestation == "privé" and etendue_percent <= 0 and franchise == 0:
             return CategoryResult("Hospitalisation", "Vert",
-                                  {"type": type_prestation, "etendue": etendue_percent, "franchise": franchise})
+                                  {"type": type_prestation, "etendue_percent": etendue_percent, "franchise": franchise})
 
-        # Silver (Orange): Semi-privé, Étendue <= 10% ou <= CHF 100/jour
+        # 🟠 Couverture correcte
         elif type_prestation == "semi-privé" and etendue_percent <= 10:
             return CategoryResult("Hospitalisation", "Orange",
-                                  {"type": type_prestation, "etendue": etendue_percent, "franchise": franchise})
+                                  {"type": type_prestation, "etendue_percent": etendue_percent, "franchise": franchise})
 
-        # Bronze (Rouge): Autres cas
+        # 🔴 Cas général : couverture limitée
         return CategoryResult("Hospitalisation", "Rouge",
-                              {"type": type_prestation, "etendue": etendue_percent, "franchise": franchise})
+                              {"type": type_prestation, "etendue_percent": etendue_percent, "franchise": franchise})
+
 
     def analyze_voyage(self, data: Dict) -> CategoryResult:
         """Analyse la catégorie Voyage."""
