@@ -167,30 +167,47 @@ class InsuranceAnalyzer:
                               {"urgence": urgence, "rapatriement": rapatriement, "annulation": annulation})
 
     def analyze_ambulatoire(self, data: Dict) -> CategoryResult:
-        """Analyse la catégorie Ambulatoire."""
+        """Analyse la catégorie Ambulatoire (lunettes, psychothérapie, médicaments, transport, sauvetage)."""
         prestations = data.get("prestations", {})
-        participation = data.get("participation", 0)  # % de participation
+        participation = data.get("participation", 0)  # % de participation financière
 
-        # Vérifier que toutes les prestations sont définies
         required_keys = ["lunettes", "psychotherapie", "medicaments_hors_liste", "transport", "sauvetage"]
+
+        # Complète les clés manquantes comme 'limité' (par défaut)
         for key in required_keys:
             if key not in prestations:
-                prestations[key] = "limité"  # Valeur par défaut
+                prestations[key] = "absent"  # plus explicite que "limité" ici
 
         logger.info(f"Ambulatoire - Prestations: {prestations}, Participation: {participation}%")
 
-        # Gold (Vert): Toutes prestations illimitées et participation <= 10%
-        if all(value == "illimité" for value in prestations.values()) and participation <= 10:
+        values = list(prestations.values())
+
+        # Cas Vert
+        if all(v == "illimité" for v in values) and participation <= 10:
             return CategoryResult("Ambulatoire", "Vert",
                                   {"prestations": prestations, "participation": participation})
 
-        # Silver (Orange): Toutes prestations définies mais limitées OU participation > 10%
-        elif all(key in prestations for key in required_keys) and (
-                any(value == "limité" for value in prestations.values()) or participation > 10):
+        # Cas Orange : toutes illimitées mais quote-part > 10%
+        if all(v == "illimité" for v in values) and participation > 10:
             return CategoryResult("Ambulatoire", "Orange",
                                   {"prestations": prestations, "participation": participation})
 
-        # Bronze (Rouge): Prestation manquante OU limitée avec participation > 10%
+        # Cas Orange : toutes limitées et quote-part ≤ 10%
+        if all(v == "limité" for v in values) and participation <= 10:
+            return CategoryResult("Ambulatoire", "Orange",
+                                  {"prestations": prestations, "participation": participation})
+
+        # Cas Rouge : limitées + participation > 10%
+        if all(v in ["limité", "illimité"] for v in values) and participation > 10:
+            return CategoryResult("Ambulatoire", "Rouge",
+                                  {"prestations": prestations, "participation": participation})
+
+        # Cas Rouge : une ou plusieurs prestations absentes
+        if any(v == "absent" for v in values):
+            return CategoryResult("Ambulatoire", "Rouge",
+                                  {"prestations": prestations, "participation": participation})
+
+        # Par défaut (sécurité)
         return CategoryResult("Ambulatoire", "Rouge",
                               {"prestations": prestations, "participation": participation})
 
@@ -298,18 +315,3 @@ class InsuranceAnalyzer:
 # Example usage (for testing)
 if __name__ == "__main__":
     analyzer = InsuranceAnalyzer()
-    sample_data = {
-        "medecine_naturelle": {"etendue": 85, "plafond": 25, "franchise": 0},
-        "hospitalisation": {"type": "privé", "etendue": 0, "franchise": 0},
-        "voyage": {"traitement_urgence": True, "rapatriement": True, "annulation": True},
-        "ambulatoire": {"prestations": {"lunettes": "illimité", "psychotherapie": "illimité",
-                                        "medicaments_hors_liste": "illimité", "transport": "illimité",
-                                        "sauvetage": "illimité"}, "participation": 5},
-        "accident": {"clinique_privee": True, "prestations_supplementaires": True, "capital_deces_invalidite": True},
-        "dentaire": {"etendue": 80, "plafond": 3500, "franchise": 0, "orthodontie": 12000},
-        "birth_date": "2016-12-05"
-    }
-    analysis = analyzer.analyze_pdf(sample_data)
-    print(f"Résultat global: {analysis.overall_medal}")
-    for cat in analysis.categories:
-        print(f"{cat.name}: {cat.color}")
