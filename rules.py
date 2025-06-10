@@ -3,7 +3,12 @@ from typing import Dict, List, Optional
 from dataclasses import dataclass
 from datetime import datetime
 import logging
+from typing import Dict, Optional
 
+
+logger = logging.getLogger(__name__)
+
+TARIF_REFERENCE_SEANCE = 120
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("assurance-rules")
@@ -62,23 +67,33 @@ class InsuranceAnalyzer:
 
     def analyze_medecine_naturelle(self, data: Dict) -> CategoryResult:
         """Analyse la catégorie Médecine naturelle."""
-        etendue = data.get("etendue", 0)  # En %
+
+        # Étendue peut être donnée directement (en %) ou calculée à partir d’un forfait
+        etendue = data.get("etendue")  # % direct
+        montant_par_seance = data.get("montant_par_seance")  # Si donné sous forme de forfait
+
+        if etendue is None and montant_par_seance is not None:
+            etendue = (montant_par_seance / TARIF_REFERENCE_SEANCE) * 100
+            etendue = round(etendue, 2)
+        elif etendue is None:
+            etendue = 0
+
         plafond = data.get("plafond", 0)  # Nombre de séances
-        franchise = data.get("franchise", 0)  # En CHF
+        franchise = data.get("franchise", 0)  # CHF
 
         logger.info(f"Médecine naturelle - Étendue: {etendue}%, Plafond: {plafond} séances, Franchise: {franchise} CHF")
 
-        # Gold (Vert): Étendue > 80%, Plafond > 20, Franchise = 0
-        if etendue > 80 and plafond > 20 and franchise == 0:
+        # Vert / Gold
+        if etendue >= 80 and plafond >= 20 and franchise == 0:
             return CategoryResult("Médecine naturelle", "Vert",
                                   {"etendue": etendue, "plafond": plafond, "franchise": franchise})
 
-        # Silver (Orange): Étendue > 50%, Plafond >= 10, Franchise < 200
-        elif etendue > 50 and plafond >= 10 and franchise < 200:
+        # Orange / Silver
+        elif etendue >= 50 and etendue < 80 and plafond >= 10 and plafond < 20 and franchise < 200:
             return CategoryResult("Médecine naturelle", "Orange",
                                   {"etendue": etendue, "plafond": plafond, "franchise": franchise})
 
-        # Bronze (Rouge): Autres cas
+        # Rouge / Bronze
         return CategoryResult("Médecine naturelle", "Rouge",
                               {"etendue": etendue, "plafond": plafond, "franchise": franchise})
 
