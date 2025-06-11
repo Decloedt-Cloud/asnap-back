@@ -27,7 +27,7 @@ SMTP_EMAIL = os.getenv("SMTP_EMAIL")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
 # Qwen API configuration
-QWEN_API_URL = "https://label-lonely-viewer-msg.trycloudflare.com/v1/chat/completions"
+QWEN_API_URL = "http://192.168.100.10:1234/v1/chat/completions"
 
 # Initialize FastAPI
 app = FastAPI(title="📊 Assurance IA - Benchmarking API")
@@ -42,6 +42,72 @@ app.add_middleware(
 )
 
 
+def extract_company_name(text: str) -> str:
+    """Extract insurance company name from PDF text."""
+
+    # Dictionnaire des compagnies avec leurs variantes possibles
+    company_patterns = {
+        "Assura": [
+            r"(?i)\bAssura\b", r"(?i)\bComplementa\b", r"(?i)\bOptima\b",
+            r"(?i)\bHospita\b", r"(?i)\bPrevisa\b", r"(?i)\bNatura\b",
+            r"(?i)\bMedia\b", r"(?i)\bDenta Plus\b", r"(?i)\bMondia Plus\b"
+        ],
+        "CSS": [
+            r"(?i)\bCSS\b", r"(?i)\bCSS Assurance\b", r"(?i)\bCSS Insurance\b",
+            r"(?i)\bMyFlex\b", r"(?i)\bTop\b", r"(?i)\bPremium\b", r"(?i)\bStar\b"
+        ],
+        "Helsana": [
+            r"(?i)\bHelsana\b", r"(?i)\bCOMPLETA\b", r"(?i)\bSANA\b",
+            r"(?i)\bOPTIMA\b", r"(?i)\bHelsana Assurances\b"
+        ],
+        "SWICA": [
+            r"(?i)\bSWICA\b", r"(?i)\bCOMPLETA\b", r"(?i)\bOPTIMA\b",
+            r"(?i)\bPRIMEO\b", r"(?i)\bSWICA Assurance\b"
+        ],
+        "KPT": [
+            r"(?i)\bKPT\b", r"(?i)\bKPT Assurance\b", r"(?i)\bKrankenkasse KPT\b",
+            r"(?i)\bKPT/CPT\b"
+        ],
+        "Groupe Mutuel": [
+            r"(?i)\bGroupe Mutuel\b", r"(?i)\bMutuel\b", r"(?i)\bAMB\b",
+            r"(?i)\bEasy Sana\b", r"(?i)\bOptima\b"
+        ],
+        "Concordia": [
+            r"(?i)\bConcordia\b", r"(?i)\bConcordia Assurance\b"
+        ],
+        "Sanitas": [
+            r"(?i)\bSanitas\b", r"(?i)\bSanitas Assurance\b"
+        ],
+        "Visana": [
+            r"(?i)\bVisana\b", r"(?i)\bVisana Assurance\b"
+        ],
+        "Atupri": [
+            r"(?i)\bAtupri\b", r"(?i)\bAtupri Assurance\b"
+        ]
+    }
+
+    # Recherche dans le texte
+    for company, patterns in company_patterns.items():
+        for pattern in patterns:
+            if re.search(pattern, text):
+                logger.info(f"Compagnie détectée: {company} (motif: {pattern})")
+                return company.lower()
+
+    # Si aucune compagnie spécifique n'est trouvée, essayer de détecter d'autres indices
+    generic_patterns = [
+        r"(?i)Caisse[- ]maladie",
+        r"(?i)Assurance[- ]maladie",
+        r"(?i)Krankenkasse",
+        r"(?i)Versicherung"
+    ]
+
+    for pattern in generic_patterns:
+        if re.search(pattern, text):
+            logger.info("Compagnie générique détectée")
+            return "generic"
+
+    logger.warning("Aucune compagnie d'assurance détectée dans le texte")
+    return "unknown"
 def normalize_extracted_data(data: Dict) -> Dict:
     """Normalize Qwen's extracted data to match rules.py expectations."""
 
@@ -125,7 +191,8 @@ def normalize_extracted_data(data: Dict) -> Dict:
             "franchise": to_float(data.get("dentaire", {}).get("franchise", "0")),
             "orthodontie": to_float(data.get("dentaire", {}).get("orthodontie", "0"))
         },
-        "birth_date": str(data.get("birth_date", "2000-01-01"))
+        "birth_date": str(data.get("birth_date", "2000-01-01")),
+        "compagnie": data.get("compagnie", "unknown"),
     }
     logger.info(f"Normalized data: {json.dumps(normalized, indent=2, ensure_ascii=False)}")
     return normalized
@@ -139,7 +206,8 @@ def extract_text_with_qwen(pdf_bytes: bytes) -> Dict:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         text = "\n".join([page.get_text("text") or "" for page in doc])
         logger.info("Texte extrait du PDF avec succès. Sample: %s...", text[:500])
-
+        company_name = extract_company_name(text)
+        logger.info(f"Compagnie détectée: {company_name}")
         # Check if this is Simon Mozer's policy for fallback
         if "Simon Mozer" in text and "1614870" in text:
             logger.info("Utilisation du fallback manuel pour Simon Mozer")
@@ -163,7 +231,8 @@ def extract_text_with_qwen(pdf_bytes: bytes) -> Dict:
                     "capital_deces_invalidite": False
                 },
                 "dentaire": {"etendue": 0, "plafond": 0, "franchise": 0, "orthodontie": 0},
-                "birth_date": "1987-03-09"
+                "birth_date": "1987-03-09",
+                "compagnie": company_name,
             }
 
         # Detect insurance provider keywords
@@ -224,7 +293,8 @@ def extract_text_with_qwen(pdf_bytes: bytes) -> Dict:
     "franchise": [nombre],             // CHF
     "orthodontie": [nombre]            // CHF (si >10'000) ou 0 (enfant <12 ans)
   },
-  "birth_date": "[YYYY-MM-DD]"       // pour calculer l'âge de l'assuré
+  "birth_date": "[YYYY-MM-DD]",       // pour calculer l'âge de l'assuré
+  "compagnie": "{company_name}"
 }
 
         """
@@ -288,7 +358,8 @@ def extract_text_with_qwen(pdf_bytes: bytes) -> Dict:
                     "capital_deces_invalidite": False
                 },
                 "dentaire": {"etendue": 0, "plafond": 0, "franchise": 0, "orthodontie": 0},
-                "birth_date": "1987-03-09"
+                "birth_date": "1987-03-09",
+                "compagnie": extract_company_name(text),
             }
         return {}
     except Exception as e:
