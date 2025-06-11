@@ -27,7 +27,7 @@ SMTP_EMAIL = os.getenv("SMTP_EMAIL")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
 # Qwen API configuration
-QWEN_API_URL = "https://label-lonely-viewer-msg.trycloudflare.com/v1/chat/completions"
+QWEN_API_URL = "http://192.168.100.10:1234/v1/chat/completions"
 
 # Initialize FastAPI
 app = FastAPI(title="📊 Assurance IA - Benchmarking API")
@@ -208,32 +208,6 @@ def extract_text_with_qwen(pdf_bytes: bytes) -> Dict:
         logger.info("Texte extrait du PDF avec succès. Sample: %s...", text[:500])
         company_name = extract_company_name(text)
         logger.info(f"Compagnie détectée: {company_name}")
-        # Check if this is Simon Mozer's policy for fallback
-        if "Simon Mozer" in text and "1614870" in text:
-            logger.info("Utilisation du fallback manuel pour Simon Mozer")
-            return {
-                "medecine_naturelle": {"etendue": 0, "plafond": 0, "franchise": 0},
-                "hospitalisation": {"type": "commune", "etendue": 3000, "franchise": 0},
-                "voyage": {"traitement_urgence": False, "rapatriement": False, "annulation": False},
-                "ambulatoire": {
-                    "prestations": {
-                        "lunettes": "limité",
-                        "psychotherapie": "limité",
-                        "medicaments_hors_liste": "limité",
-                        "transport": "limité",
-                        "sauvetage": "limité"
-                    },
-                    "participation": 100
-                },
-                "accident": {
-                    "clinique_privee": False,
-                    "prestations_supplementaires": False,
-                    "capital_deces_invalidite": False
-                },
-                "dentaire": {"etendue": 0, "plafond": 0, "franchise": 0, "orthodontie": 0},
-                "birth_date": "1987-03-09",
-                "compagnie": company_name,
-            }
 
         # Detect insurance provider keywords
         provider_keywords = {
@@ -334,34 +308,6 @@ def extract_text_with_qwen(pdf_bytes: bytes) -> Dict:
         parsed_json = json.loads(json_str)
         return normalize_extracted_data(parsed_json)
 
-    except requests.exceptions.ReadTimeout:
-        logger.warning("Timeout Qwen API, using fallback for Simon Mozer")
-        # Fallback manuel pour Simon Mozer
-        if "Simon Mozer" in text and "1614870" in text:
-            return {
-                "medecine_naturelle": {"etendue": 0, "plafond": 0, "franchise": 0},
-                "hospitalisation": {"type": "commune", "etendue": 3000, "franchise": 0},
-                "voyage": {"traitement_urgence": False, "rapatriement": False, "annulation": False},
-                "ambulatoire": {
-                    "prestations": {
-                        "lunettes": "limité",
-                        "psychotherapie": "limité",
-                        "medicaments_hors_liste": "limité",
-                        "transport": "limité",
-                        "sauvetage": "limité"
-                    },
-                    "participation": 100
-                },
-                "accident": {
-                    "clinique_privee": False,
-                    "prestations_supplementaires": False,
-                    "capital_deces_invalidite": False
-                },
-                "dentaire": {"etendue": 0, "plafond": 0, "franchise": 0, "orthodontie": 0},
-                "birth_date": "1987-03-09",
-                "compagnie": extract_company_name(text),
-            }
-        return {}
     except Exception as e:
         logger.error(f"Extraction error with Qwen: {e}\n{traceback.format_exc()}")
         return {}
