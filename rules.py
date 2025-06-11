@@ -1,9 +1,10 @@
 import json
-import logging
+from typing import Dict, List, Optional
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict
-from typing import List
+import logging
+from typing import Dict, Optional
+
 
 logger = logging.getLogger(__name__)
 
@@ -65,8 +66,7 @@ class InsuranceAnalyzer:
         logger.info(f"Médaille globale: {overall_medal}")
         return InsuranceAnalysis(overall_medal=overall_medal, categories=self.results)
 
-    @staticmethod
-    def analyze_medecine_naturelle(data: Dict) -> CategoryResult:
+    def analyze_medecine_naturelle(self, data: Dict) -> CategoryResult:
         """Analyse la catégorie Médecine naturelle."""
 
         # Étendue peut être donnée directement (en %) ou calculée à partir d’un forfait
@@ -98,7 +98,6 @@ class InsuranceAnalyzer:
         return CategoryResult("Médecine naturelle", "Rouge",
                               {"etendue": etendue, "plafond": plafond, "franchise": franchise})
 
-    @staticmethod
     def analyze_hospitalisation(self, data: Dict) -> CategoryResult:
         """Analyse la catégorie Hospitalisation, avec gestion des cas particuliers (ex. franchise volontaire chez KPT)."""
 
@@ -145,7 +144,6 @@ class InsuranceAnalyzer:
                               {"type": type_prestation, "etendue_percent": etendue_percent, "franchise": franchise})
 
 
-    @staticmethod
     def analyze_voyage(self, data: Dict) -> CategoryResult:
         """Analyse la catégorie Voyage."""
         urgence = data.get("traitement_urgence", False)
@@ -168,7 +166,6 @@ class InsuranceAnalyzer:
         return CategoryResult("Voyage", "Rouge",
                               {"urgence": urgence, "rapatriement": rapatriement, "annulation": annulation})
 
-    @staticmethod
     def analyze_ambulatoire(self, data: Dict) -> CategoryResult:
         """Analyse la catégorie Ambulatoire (lunettes, psychothérapie, médicaments, transport, sauvetage)."""
         prestations = data.get("prestations", {})
@@ -214,7 +211,6 @@ class InsuranceAnalyzer:
         return CategoryResult("Ambulatoire", "Rouge",
                               {"prestations": prestations, "participation": participation})
 
-    @staticmethod
     def analyze_accident(self, data: Dict) -> CategoryResult:
         """Analyse la catégorie Accident."""
         clinique = data.get("clinique_privee", False)
@@ -241,7 +237,6 @@ class InsuranceAnalyzer:
                               {"clinique": clinique, "prestations_sup": prestations_sup,
                                "capital_deces": capital_deces})
 
-    @staticmethod
     def analyze_dentaire(self, data: Dict, birth_date: str) -> CategoryResult:
         """Analyse la catégorie Dentaire."""
         etendue = data.get("etendue", 0)  # %
