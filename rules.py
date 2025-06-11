@@ -1,9 +1,9 @@
 import json
-from typing import Dict, List, Optional
+from typing import  List
 from dataclasses import dataclass
 from datetime import datetime
 import logging
-from typing import Dict, Optional
+from typing import Dict
 
 
 logger = logging.getLogger(__name__)
@@ -12,7 +12,7 @@ TARIF_REFERENCE_SEANCE = 120
 TARIF_NUITEE = 1500
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger("assurance-rules")
+#logger = logging.getLogger("assurance-rules")
 
 
 @dataclass
@@ -37,8 +37,6 @@ class InsuranceAnalyzer:
     def analyze_pdf(self, pdf_data: Dict) -> InsuranceAnalysis:
         """Analyse les données extraites du PDF."""
         self.results = []
-
-        # Extract birth date for age calculations
         birth_date = pdf_data.get("birth_date", "2000-01-01")
         logger.info(f"Date de naissance extraite: {birth_date}")
 
@@ -152,17 +150,17 @@ class InsuranceAnalyzer:
 
         logger.info(f"Voyage - Urgence: {urgence}, Rapatriement: {rapatriement}, Annulation: {annulation}")
 
-        # Gold (Vert): Tous les critères présents
+        # Gold (Vert) : Tous les critères présents
         if urgence and rapatriement and annulation:
             return CategoryResult("Voyage", "Vert",
                                   {"urgence": urgence, "rapatriement": rapatriement, "annulation": annulation})
 
-        # Silver (Orange): Deux critères présents (sans annulation)
+        # Silver (Orange) : Deux critères présents (sans annulation)
         elif urgence and rapatriement and not annulation:
             return CategoryResult("Voyage", "Orange",
                                   {"urgence": urgence, "rapatriement": rapatriement, "annulation": annulation})
 
-        # Bronze (Rouge): Moins de deux critères
+        # Bronze (Rouge) : Moins de deux critères
         return CategoryResult("Voyage", "Rouge",
                               {"urgence": urgence, "rapatriement": rapatriement, "annulation": annulation})
 
@@ -187,7 +185,7 @@ class InsuranceAnalyzer:
             return CategoryResult("Ambulatoire", "Vert",
                                   {"prestations": prestations, "participation": participation})
 
-        # Cas Orange : toutes illimitées mais quote-part > 10%
+        # Cas Orange : toutes illimitées, mais quote-part > 10%
         if all(v == "illimité" for v in values) and participation > 10:
             return CategoryResult("Ambulatoire", "Orange",
                                   {"prestations": prestations, "participation": participation})
@@ -220,19 +218,19 @@ class InsuranceAnalyzer:
         logger.info(
             f"Accident - Clinique privée: {clinique}, Prestations supp: {prestations_sup}, Capital décès: {capital_deces}")
 
-        # Gold (Vert): Tous les critères présents
+        # Gold (Vert) : Tous les critères présents
         if clinique and prestations_sup and capital_deces:
             return CategoryResult("Accident", "Vert",
                                   {"clinique": clinique, "prestations_sup": prestations_sup,
                                    "capital_deces": capital_deces})
 
-        # Silver (Orange): Seule la clinique privée est couverte
+        # Silver (Orange) : Seule la clinique privée est couverte
         elif clinique and not (prestations_sup or capital_deces):
             return CategoryResult("Accident", "Orange",
                                   {"clinique": clinique, "prestations_sup": prestations_sup,
                                    "capital_deces": capital_deces})
 
-        # Bronze (Rouge): Aucun critère ou seulement prestations supplémentaires/capital
+        # Bronze (Rouge) : Aucun critère ou seulement prestations supplémentaires/capital
         return CategoryResult("Accident", "Rouge",
                               {"clinique": clinique, "prestations_sup": prestations_sup,
                                "capital_deces": capital_deces})
@@ -245,7 +243,6 @@ class InsuranceAnalyzer:
         orthodontie = data.get("orthodontie", 0)  # CHF
 
         # Calcul de l'âge pour l'orthodontie
-        is_child = False
         try:
             birth_dt = datetime.strptime(birth_date, "%Y-%m-%d")
             age = (datetime.now() - birth_dt).days // 365
@@ -258,7 +255,7 @@ class InsuranceAnalyzer:
         logger.info(
             f"Dentaire - Étendue: {etendue}%, Plafond: {plafond} CHF, Franchise: {franchise} CHF, Orthodontie: {orthodontie} CHF, Enfant: {is_child}")
 
-        # Règle spéciale: Enfant sans couverture orthodontique suffisante = Rouge
+        # Règle spéciale : Enfant sans couverture orthodontique suffisante = Rouge
         if is_child and orthodontie < 10000:
             return CategoryResult("Dentaire", "Rouge",
                                   {"etendue": etendue, "plafond": plafond, "franchise": franchise,
@@ -276,7 +273,7 @@ class InsuranceAnalyzer:
                                   {"etendue": etendue, "plafond": plafond, "franchise": franchise,
                                    "orthodontie": orthodontie, "is_child": is_child})
 
-        # Bronze (Rouge): Autres cas
+        # Bronze (Rouge) : Autres cas
         return CategoryResult("Dentaire", "Rouge",
                               {"etendue": etendue, "plafond": plafond, "franchise": franchise,
                                "orthodontie": orthodontie, "is_child": is_child})
@@ -296,7 +293,7 @@ class InsuranceAnalyzer:
         elif rouge_count <= 1 and orange_count <= 3:
             return "Silver"
 
-        # Bronze: Autres cas
+        # Bronze : Autres cas
         return "Bronze"
 
     def rectify_analysis(self, optional_exclusions: List[str]) -> InsuranceAnalysis:
