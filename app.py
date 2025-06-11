@@ -27,7 +27,7 @@ SMTP_EMAIL = os.getenv("SMTP_EMAIL")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
 # Qwen API configuration
-QWEN_API_URL = "http://192.168.100.10:1234/v1/chat/completions"
+QWEN_API_URL = "https://label-lonely-viewer-msg.trycloudflare.com/v1/chat/completions"
 
 # Initialize FastAPI
 app = FastAPI(title="📊 Assurance IA - Benchmarking API")
