@@ -312,13 +312,6 @@ def extract_text_with_qwen(pdf_bytes: bytes) -> Dict:
         logger.error(f"Extraction error with Qwen: {e}\n{traceback.format_exc()}")
         return {}
 
-
-
-
-# API endpoint: Analyze PDF and generate benchmark report
-
-
-
 # Send email to the user
 def send_email_to_user(user_email: str, file_name: str, analysis: 'InsuranceAnalysis'):
     try:
@@ -343,235 +336,14 @@ def send_email_to_user(user_email: str, file_name: str, analysis: 'InsuranceAnal
         msg["From"] = SMTP_EMAIL
         msg["To"] = user_email
         msg["Subject"] = "✨ Votre analyse d'assurance est prête"
-
+        with open('email_user_style.css', 'r') as css_file:
+            user_css = css_file.read()
         html_content = f"""<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        * {{
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }}
-
-        body {{
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            padding: 20px;
-            line-height: 1.6;
-        }}
-
-        .email-container {{
-            max-width: 650px;
-            margin: 0 auto;
-            background: #ffffff;
-            border-radius: 20px;
-            overflow: hidden;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-        }}
-
-        .header {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 40px 30px;
-            text-align: center;
-            color: white;
-            position: relative;
-        }}
-
-        .header::before {{
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 20"><defs><pattern id="grain" width="100" height="20" patternUnits="userSpaceOnUse"><circle cx="10" cy="10" r="0.5" fill="white" opacity="0.1"/><circle cx="30" cy="5" r="0.3" fill="white" opacity="0.1"/><circle cx="50" cy="15" r="0.4" fill="white" opacity="0.1"/><circle cx="70" cy="8" r="0.2" fill="white" opacity="0.1"/><circle cx="90" cy="12" r="0.3" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="20" fill="url(%23grain)"/></svg>');
-        }}
-
-        .logo {{
-            font-size: 32px;
-            font-weight: 700;
-            margin-bottom: 10px;
-            position: relative;
-            z-index: 1;
-        }}
-
-        .tagline {{
-            font-size: 16px;
-            opacity: 0.9;
-            position: relative;
-            z-index: 1;
-        }}
-
-        .content {{
-            padding: 40px 30px;
-        }}
-
-        .greeting {{
-            font-size: 24px;
-            color: #2c3e50;
-            margin-bottom: 20px;
-            font-weight: 600;
-        }}
-
-        .intro-text {{
-            color: #5a6c7d;
-            font-size: 16px;
-            margin-bottom: 30px;
-            line-height: 1.8;
-        }}
-
-        .result-badge {{
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            background: linear-gradient(45deg, #ffd700, #ffed4a);
-            color: #8b5a00;
-            padding: 15px 25px;
-            border-radius: 50px;
-            font-weight: 700;
-            font-size: 18px;
-            margin: 20px 0;
-            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
-        }}
-
-        .section-title {{
-            color: #2c3e50;
-            font-size: 20px;
-            font-weight: 600;
-            margin: 30px 0 20px 0;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }}
-
-        .results-table {{
-            width: 100%;
-            border-collapse: collapse;
-            background: #ffffff;
-            border-radius: 15px;
-            overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-            margin-bottom: 30px;
-        }}
-
-        .results-table th {{
-            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-            padding: 20px;
-            text-align: left;
-            font-weight: 600;
-            color: #495057;
-            font-size: 14px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            vertical-align: middle;
-        }}
-
-        .results-table th:last-child {{
-            text-align: center;
-        }}
-
-        .vert {{
-            background: linear-gradient(135deg, #28a745, #20c997);
-            color: white;
-        }}
-
-        .orange {{
-            background: linear-gradient(135deg, #ffc107, #fd7e14);
-            color: white;
-        }}
-
-        .rouge {{
-            background: linear-gradient(135deg, #dc3545, #e83e8c);
-            color: white;
-        }}
-
-        .rectifier-section {{
-            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-            padding: 30px;
-            border-radius: 15px;
-            text-align: center;
-            margin: 30px 0;
-        }}
-
-        .rectifier-title {{
-            color: #2c3e50;
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 15px;
-        }}
-
-        .rectifier-description {{
-            color: #6c757d;
-            margin-bottom: 25px;
-            font-size: 14px;
-        }}
-
-        .rectifier-btn {{
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            padding: 15px 30px;
-            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
-            color: white;
-            text-decoration: none;
-            border-radius: 50px;
-            font-weight: 600;
-            font-size: 16px;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 20px rgba(255, 107, 107, 0.3);
-        }}
-
-        .rectifier-btn:hover {{
-            transform: translateY(-2px);
-            box-shadow: 0 6px 25px rgba(255, 107, 107, 0.4);
-        }}
-
-        .footer {{
-            background: #2c3e50;
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }}
-
-        .footer-content {{
-            margin-bottom: 20px;
-        }}
-
-        .contact-info {{
-            font-size: 14px;
-            opacity: 0.8;
-            line-height: 1.8;
-        }}
-
-        .contact-info a {{
-            color: #3498db;
-            text-decoration: none;
-        }}
-
-        @media (max-width: 600px) {{
-            .email-container {{
-                margin: 10px;
-                border-radius: 15px;
-            }}
-
-            .header, .content, .footer {{
-                padding: 25px 20px;
-            }}
-
-            .greeting {{
-                font-size: 20px;
-            }}
-
-            .results-table th, .results-table td {{
-                padding: 12px 10px;
-                font-size: 14px;
-            }}
-        }}
-    </style>
+    <style>{user_css}</style>
 </head>
 <body>
     <div class="email-container">
@@ -676,156 +448,14 @@ def send_email_to_admin(user_email: str, phone: str, file_name: str, analysis: '
         msg["From"] = SMTP_EMAIL
         msg["To"] = "proiadev@gmail.com"
         msg["Subject"] = "🔔 Nouveau benchmark ASNAP"
-
+        with open('email_admin_style.css', 'r') as css_file:
+            admin_css = css_file.read()
         html_content = f"""<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        * {{
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }}
-
-        body {{
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 20px;
-            line-height: 1.6;
-        }}
-
-        .email-container {{
-            max-width: 600px;
-            margin: 0 auto;
-            background: #ffffff;
-            border-radius: 15px;
-            overflow: hidden;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
-        }}
-
-        .admin-header {{
-            background: linear-gradient(135deg, #2c3e50, #34495e);
-            padding: 25px;
-            color: white;
-            text-align: center;
-        }}
-
-        .admin-header h1 {{
-            font-size: 24px;
-            margin-bottom: 5px;
-        }}
-
-        .admin-header .subtitle {{
-            opacity: 0.8;
-            font-size: 14px;
-        }}
-
-        .content {{
-            padding: 30px 25px;
-        }}
-
-        .user-info {{
-            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 25px;
-        }}
-
-        .user-info h3 {{
-            color: #2c3e50;
-            margin-bottom: 15px;
-            font-size: 16px;
-        }}
-
-        .info-row {{
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-            font-size: 14px;
-        }}
-
-        .info-label {{
-            font-weight: 600;
-            color: #495057;
-        }}
-
-        .info-value {{
-            color: #6c757d;
-        }}
-
-        .result-summary {{
-            background: linear-gradient(135deg, #fff3cd, #ffeaa7);
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 25px;
-            text-align: center;
-        }}
-
-        .result-badge {{
-            display: inline-block;
-            background: linear-gradient(45deg, #ffd700, #ffed4a);
-            color: #8b5a00;
-            padding: 10px 20px;
-            border-radius: 25px;
-            font-weight: 700;
-            font-size: 16px;
-        }}
-
-        .results-table {{
-            width: 100%;
-            border-collapse: collapse;
-            background: #ffffff;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-        }}
-
-        .results-table th {{
-            background: #f8f9fa;
-            padding: 12px 15px;
-            text-align: left;
-            font-weight: 600;
-            color: #495057;
-            font-size: 13px;
-            text-transform: uppercase;
-            vertical-align: middle;
-        }}
-
-        .results-table th:last-child {{
-            text-align: center;
-        }}
-
-        .vert {{
-            background: linear-gradient(135deg, #28a745, #20c997);
-            color: white;
-        }}
-
-        .orange {{
-            background: linear-gradient(135deg, #ffc107, #fd7e14);
-            color: white;
-        }}
-
-        .rouge {{
-            background: linear-gradient(135deg, #dc3545, #e83e8c);
-            color: white;
-        }}
-
-        .footer {{
-            background: #f8f9fa;
-            padding: 20px;
-            text-align: center;
-            color: #6c757d;
-            font-size: 12px;
-        }}
-
-        .timestamp {{
-            color: #adb5bd;
-            font-style: italic;
-            margin-top: 10px;
-        }}
-    </style>
+    <style>{admin_css}</style>
 </head>
 <body>
     <div class="email-container">
@@ -888,7 +518,6 @@ def send_email_to_admin(user_email: str, phone: str, file_name: str, analysis: '
     except Exception as e:
         logger.error(f"Erreur envoi email admin : {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Erreur envoi email admin : {e}")
-
 
 # API endpoint: Analyze PDF and generate benchmark report
 @app.post("/api/upload/")
@@ -956,33 +585,6 @@ async def upload_pdf(
 @app.get("/api/health")
 async def health_check():
     return {"status": "healthy", "message": "API is running with Qwen integration"}
-
-
-# Test Qwen connection endpoint
-@app.get("/test-qwen")
-async def test_qwen():
-    try:
-        payload = {
-            "model": "qwen",
-            "messages": [
-                {
-                    "role": "user",
-                    "content": "Test de connexion. Réponds simplement 'OK'"
-                }
-            ],
-            "temperature": 0.1,
-            "max_tokens": 50
-        }
-
-        response = requests.post(QWEN_API_URL, json=payload, headers={"Content-Type": "application/json"}, timeout=10)
-        response.raise_for_status()
-
-        result = response.json()
-        return {"status": "success", "qwen_response": result}
-    except Exception as e:
-        logger.error(f"Erreur test Qwen : {e}\n{traceback.format_exc()}")
-        return {"status": "error", "message": str(e)}
-
 
 if __name__ == "__main__":
     import uvicorn
