@@ -4,6 +4,7 @@ import fitz  # PyMuPDF for PDF text extraction
 import smtplib
 import os
 import requests
+import subprocess
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -12,6 +13,11 @@ import logging
 from rules import InsuranceAnalyzer
 from datetime import datetime
 import traceback
+from paddleocr import PaddleOCR
+from PIL import Image
+import io
+import numpy as np
+import tempfile
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -29,6 +35,8 @@ SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 # Qwen API configuration
 QWEN_API_URL = "https://pets-quit-pr-asin.trycloudflare.com/v1/chat/completions"
 
+# Initialize PaddleOCR
+ocr = PaddleOCR(use_angle_cls=True, lang='fr')  # French language for OCR
 
 # Initialize FastAPI
 app = FastAPI(title="📊 Assurance IA - Benchmarking API")
@@ -42,11 +50,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 def extract_company_name(text: str) -> str:
-    """Extract insurance company name from PDF text."""
-
-    # Dictionnaire des compagnies avec leurs variantes possibles
+    """Extract insurance company name from text."""
     company_patterns = {
         "Assura": [
             r"(?i)\bAssura\b", r"(?i)\bComplementa\b", r"(?i)\bOptima\b",
@@ -87,14 +92,12 @@ def extract_company_name(text: str) -> str:
         ]
     }
 
-    # Recherche dans le texte
     for company, patterns in company_patterns.items():
         for pattern in patterns:
             if re.search(pattern, text):
                 logger.info(f"Compagnie détectée: {company} (motif: {pattern})")
                 return company.lower()
 
-    # Si aucune compagnie spécifique n'est trouvée, essayer de détecter d'autres indices
     generic_patterns = [
         r"(?i)Caisse[- ]maladie",
         r"(?i)Assurance[- ]maladie",
@@ -109,26 +112,21 @@ def extract_company_name(text: str) -> str:
 
     logger.warning("Aucune compagnie d'assurance détectée dans le texte")
     return "unknown"
+
 def normalize_extracted_data(data: Dict) -> Dict:
     """Normalize Qwen's extracted data to match rules.py expectations."""
-
     def to_float(value: Any, default: float = 0.0) -> float:
         try:
             if isinstance(value, (int, float)):
                 return float(value)
-
-            # Handle percentage strings or currency
             if isinstance(value, str):
                 cleaned_value = re.sub(r'[^\d.]', '', value)
                 if cleaned_value:
                     return float(cleaned_value)
-
-                # Handle textual representations
                 if "cent" in value.lower() or "hundred" in value.lower():
                     return 100.0
                 if "cinquante" in value.lower() or "fifty" in value.lower():
                     return 50.0
-
         except (ValueError, TypeError):
             logger.error(f"Conversion error for value: {value}")
         return default
@@ -136,16 +134,12 @@ def normalize_extracted_data(data: Dict) -> Dict:
     def to_bool(value: Any) -> bool:
         if isinstance(value, bool):
             return value
-
         if isinstance(value, (int, float)):
             return value > 0
-
         if isinstance(value, str):
             value = value.lower().strip()
-            true_values = ['true', 'oui', 'yes', '1', 'vrai', 'inclu', 'couv', 'inclus', 'couvert', 'incluse', 'fourni',
-                           'disponible']
+            true_values = ['true', 'oui', 'yes', '1', 'vrai', 'inclu', 'couv', 'inclus', 'couvert', 'incluse', 'fourni', 'disponible']
             return any(keyword in value for keyword in true_values)
-
         return False
 
     def to_str(value: Any, valid_values: list, default: str) -> str:
@@ -182,8 +176,7 @@ def normalize_extracted_data(data: Dict) -> Dict:
         },
         "accident": {
             "clinique_privee": to_bool(data.get("accident", {}).get("clinique_privee", "false")),
-            "prestations_supplementaires": to_bool(
-                data.get("accident", {}).get("prestations_supplementaires", "false")),
+            "prestations_supplementaires": to_bool(data.get("accident", {}).get("prestations_supplementaires", "false")),
             "capital_deces_invalidite": to_bool(data.get("accident", {}).get("capital_deces_invalidite", "false"))
         },
         "dentaire": {
@@ -198,22 +191,68 @@ def normalize_extracted_data(data: Dict) -> Dict:
     logger.info(f"Normalized data: {json.dumps(normalized, indent=2, ensure_ascii=False)}")
     return normalized
 
+def extract_text_from_image(image_bytes: bytes, file_extension: str) -> str:
+    """Extract text from JPEG or HEIC image using PaddleOCR with ImageMagick conversion for HEIC."""
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_input:
+            temp_input.write(image_bytes)
+            temp_input_path = temp_input.name
 
-def extract_text_with_qwen(pdf_bytes: bytes) -> Dict:
-    """Extract structured information using Qwen API with fallback handling"""
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_output:
+            temp_output_path = temp_output.name
+
+        # Convert HEIC to JPEG using ImageMagick
+        if file_extension.lower() == '.heic':
+            subprocess.run(["magick", temp_input_path, temp_output_path], check=True, capture_output=True, text=True)
+            image = Image.open(temp_output_path)
+        else:  # JPEG
+            image = Image.open(temp_input_path)
+
+        # Convert to RGB if necessary
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+
+        # Convert PIL Image to numpy array for PaddleOCR
+        image_np = np.array(image)
+
+        # Perform OCR
+        result = ocr.ocr(image_np, cls=True)
+
+        # Extract text from OCR results
+        text_lines = [line[1][0] for line in result[0] if line[1][0]]  # Extract text from each detected line
+        text = "\n".join(text_lines)
+        logger.info(f"Texte extrait de l'image avec succès. Sample: {text[:500]}...")
+
+        # Clean up temporary files
+        os.unlink(temp_input_path)
+        if file_extension.lower() == '.heic':
+            os.unlink(temp_output_path)
+
+        return text
+    except Exception as e:
+        logger.error(f"Erreur lors de l'extraction de texte de l'image: {e}\n{traceback.format_exc()}")
+        # Clean up temporary files if they exist
+        for path in [temp_input_path, temp_output_path]:
+            if path and os.path.exists(path):
+                os.unlink(path)
+        return ""
+
+def extract_text_with_qwen(file_bytes: bytes, file_extension: str) -> Dict:
+    """Extract structured information using Qwen API with fallback handling for PDF, JPEG, or HEIC."""
     text = ""
     try:
-        # Extract text from PDF first
-        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-        text = "\n".join([page.get_text("text") or "" for page in doc])
-        logger.info("Texte extrait du PDF avec succès. Sample: %s...", text[:500])
+        if file_extension.lower() in ['.jpg', '.jpeg', '.heic']:
+            text = extract_text_from_image(file_bytes, file_extension)
+        else:  # Assume PDF
+            doc = fitz.open(stream=file_bytes, filetype="pdf")
+            text = "\n".join([page.get_text("text") or "" for page in doc])
+            logger.info("Texte extrait du PDF avec succès. Sample: %s...", text[:500])
+
         company_name = extract_company_name(text)
         logger.info(f"Compagnie détectée: {company_name}")
 
-        # Detect insurance provider keywords
         provider_keywords = {
-            "Assura": ["Assura", "Complementa", "Optima", "Hospita", "Previsa", "Natura", "Media", "Denta Plus",
-                       "Mondia Plus"],
+            "Assura": ["Assura", "Complementa", "Optima", "Hospita", "Previsa", "Natura", "Media", "Denta Plus", "Mondia Plus"],
             "CSS": ["CSS", "Top", "Premium", "Star"],
             "Helsana": ["Helsana", "COMPLETA", "SANA", "OPTIMA"],
             "SWICA": ["SWICA", "COMPLETA", "OPTIMA", "PRIMEO"]
@@ -227,7 +266,7 @@ def extract_text_with_qwen(pdf_bytes: bytes) -> Dict:
 
         logger.info(f"Detected insurance provider: {detected_provider}")
 
-        prompt = """Tu es un expert en extraction de données d’assurance santé suisse. Ton objectif est d'extraire les informations de couverture d’un contrat d’assurance (PDF) et de les structurer dans un format JSON conforme aux règles définies.
+        prompt = """Tu es un expert en extraction de données d’assurance santé suisse. Ton objectif est d'extraire les informations de couverture d’un contrat d’assurance (PDF ou image) et de les structurer dans un format JSON conforme aux règles définies.
 
 #### 📁 Structure Attendue du Résultat
 ```json
@@ -271,14 +310,13 @@ def extract_text_with_qwen(pdf_bytes: bytes) -> Dict:
   "birth_date": "[YYYY-MM-DD]",       // pour calculer l'âge de l'assuré
   "compagnie": "{company_name}"
 }
-
-        """
+"""
 
         payload = {
             "model": "qwen",
             "messages": [
                 {"role": "system", "content": prompt},
-                {"role": "user", "content": "Extrait les données au format JSON sans commentaires"}
+                {"role": "user", "content": f"Extrait les données au format JSON sans commentaires à partir du texte suivant:\n{text}"}
             ],
             "temperature": 0.1,
             "max_tokens": 2048
@@ -292,7 +330,6 @@ def extract_text_with_qwen(pdf_bytes: bytes) -> Dict:
         extracted_content = result['choices'][0]['message']['content']
         logger.info(f"Raw Qwen output: {extracted_content}")
 
-        # Extract JSON from response
         start_idx = extracted_content.find('{')
         end_idx = extracted_content.rfind('}') + 1
         if start_idx == -1 or end_idx == 0:
@@ -300,8 +337,6 @@ def extract_text_with_qwen(pdf_bytes: bytes) -> Dict:
             return {}
 
         json_str = extracted_content[start_idx:end_idx]
-
-        # Clean JSON string
         json_str = re.sub(r'/\*.*?\*/', '', json_str)  # Remove comments
         json_str = re.sub(r'//.*$', '', json_str, flags=re.MULTILINE)  # Remove line comments
         logger.info(f"Cleaned JSON string: {json_str}")
@@ -313,7 +348,6 @@ def extract_text_with_qwen(pdf_bytes: bytes) -> Dict:
         logger.error(f"Extraction error with Qwen: {e}\n{traceback.format_exc()}")
         return {}
 
-# Send email to the user
 def send_email_to_user(user_email: str, file_name: str, analysis: 'InsuranceAnalysis'):
     try:
         rows = []
@@ -352,23 +386,18 @@ def send_email_to_user(user_email: str, file_name: str, analysis: 'InsuranceAnal
             <div class="logo">ASNAP</div>
             <div class="tagline">Votre sérénité, en un clic</div>
         </div>
-
         <div class="content">
             <div class="greeting">Bonjour ! 👋</div>
-
             <p class="intro-text">
                 Nous avons terminé l'analyse de votre police d'assurance <strong>{file_name}</strong>. 
                 Voici un résumé détaillé de votre couverture actuelle.
             </p>
-
             <div class="result-badge">
                 🏅 Niveau de couverture : {analysis.overall_medal}
             </div>
-
             <div class="section-title">
                 📊 Détail par catégorie
             </div>
-
             <table class="results-table">
                 <thead>
                     <tr>
@@ -380,7 +409,6 @@ def send_email_to_user(user_email: str, file_name: str, analysis: 'InsuranceAnal
                     {rows_html}
                 </tbody>
             </table>
-
             <div class="rectifier-section">
                 <div class="rectifier-title">Des questions sur ces résultats ?</div>
                 <div class="rectifier-description">
@@ -395,7 +423,6 @@ def send_email_to_user(user_email: str, file_name: str, analysis: 'InsuranceAnal
                 </a>
             </div>
         </div>
-
         <div class="footer">
             <div class="footer-content">
                 <div style="font-size: 18px; font-weight: 600; margin-bottom: 15px;">ASNAP</div>
@@ -424,7 +451,6 @@ def send_email_to_user(user_email: str, file_name: str, analysis: 'InsuranceAnal
     except Exception as e:
         logger.error(f"Erreur envoi email utilisateur : {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Erreur envoi email utilisateur : {e}")
-
 
 def send_email_to_admin(user_email: str, phone: str, file_name: str, analysis: 'InsuranceAnalysis'):
     try:
@@ -464,7 +490,6 @@ def send_email_to_admin(user_email: str, phone: str, file_name: str, analysis: '
             <h1>🔔 Nouveau Benchmark</h1>
             <div class="subtitle">Administration ASNAP</div>
         </div>
-
         <div class="content">
             <div class="user-info">
                 <h3>👤 Informations Utilisateur</h3>
@@ -481,12 +506,10 @@ def send_email_to_admin(user_email: str, phone: str, file_name: str, analysis: '
                     <span class="info-value">{file_name}</span>
                 </div>
             </div>
-
             <div class="result-summary">
                 <div style="color: #2c3e50; font-weight: 600; margin-bottom: 10px;">Résultat Global</div>
                 <div class="result-badge">🏅 {analysis.overall_medal}</div>
             </div>
-
             <table class="results-table">
                 <thead>
                     <tr>
@@ -499,7 +522,6 @@ def send_email_to_admin(user_email: str, phone: str, file_name: str, analysis: '
                 </tbody>
             </table>
         </div>
-
         <div class="footer">
             <div>ASNAP Administration Panel</div>
             <div class="timestamp">Email généré automatiquement</div>
@@ -520,9 +542,8 @@ def send_email_to_admin(user_email: str, phone: str, file_name: str, analysis: '
         logger.error(f"Erreur envoi email admin : {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Erreur envoi email admin : {e}")
 
-# API endpoint: Analyze PDF and generate benchmark report
 @app.post("/api/upload/")
-async def upload_pdf(
+async def upload_file(
         file: UploadFile = File(...),
         email: str = Form(...),
         phone: str = Form(...),
@@ -532,15 +553,19 @@ async def upload_pdf(
         logger.info(f"Début du traitement pour {email}")
 
         if not file or not email or not phone:
-            raise HTTPException(status_code=400, detail="Fichier PDF, email ou téléphone manquant.")
+            raise HTTPException(status_code=400, detail="Fichier, email ou téléphone manquant.")
 
-        pdf_bytes = await file.read()
-        logger.info(f"Fichier {file.filename} reçu, taille : {len(pdf_bytes)} octets.")
+        file_extension = os.path.splitext(file.filename)[1].lower()
+        if file_extension not in ['.pdf', '.jpg', '.jpeg', '.heic']:
+            raise HTTPException(status_code=400, detail="Type de fichier non supporté. Utilisez PDF, JPEG ou HEIC.")
+
+        file_bytes = await file.read()
+        logger.info(f"Fichier {file.filename} reçu, taille : {len(file_bytes)} octets, type : {file_extension}")
 
         # Extract structured data using Qwen
-        structured_data = extract_text_with_qwen(pdf_bytes)
+        structured_data = extract_text_with_qwen(file_bytes, file_extension)
         if not structured_data:
-            raise HTTPException(status_code=500, detail="Échec de l'extraction des données du PDF.")
+            raise HTTPException(status_code=500, detail="Échec de l'extraction des données du fichier.")
 
         logger.info(f"Données structurées extraites: {json.dumps(structured_data, indent=2, ensure_ascii=False)}")
 
@@ -579,15 +604,12 @@ async def upload_pdf(
         }
     except Exception as e:
         logger.error(f"Erreur dans /upload/ endpoint : {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Erreur dans le traitement du PDF : {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur dans le traitement du fichier : {e}")
 
-
-# Health check endpoint
 @app.get("/api/health")
 async def health_check():
-    return {"status": "healthy", "message": "API is running with Qwen integration"}
+    return {"status": "healthy", "message": "API is running with Qwen and PaddleOCR integration"}
 
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run(app, host="127.0.0.1", port=8000, reload=True, log_level="debug")
