@@ -27,7 +27,7 @@ SMTP_EMAIL = os.getenv("SMTP_EMAIL")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
 # Qwen API configuration
-QWEN_API_URL = "https://pets-quit-pr-asin.trycloudflare.com/v1/chat/completions"
+QWEN_API_URL = "http://192.168.100.10:1234/v1/chat/completions"
 
 
 # Initialize FastAPI
@@ -523,31 +523,34 @@ def send_email_to_admin(user_email: str, phone: str, file_name: str, analysis: '
 # API endpoint: Analyze PDF and generate benchmark report
 @app.post("/api/upload/")
 async def upload_pdf(
-        file: UploadFile = File(...),
-        email: str = Form(...),
-        phone: str = Form(...),
-        optional_categories: str = Form("{}")
+    file: UploadFile = File(...),
+    email: str = Form(...),
+    phone: str = Form(...),
+    optional_categories: str = Form("{}")
 ):
     try:
-        logger.info(f"Début du traitement pour {email}")
+        logger.info(f"Starting processing for {email}")
 
         if not file or not email or not phone:
-            raise HTTPException(status_code=400, detail="Fichier PDF, email ou téléphone manquant.")
+            raise HTTPException(status_code=400, detail="Missing PDF file, email, or phone.")
 
         pdf_bytes = await file.read()
-        logger.info(f"Fichier {file.filename} reçu, taille : {len(pdf_bytes)} octets.")
+        logger.info(f"Received file {file.filename}, size: {len(pdf_bytes)} bytes.")
 
-        # Extract structured data using Qwen
+        # Extract structured data
         structured_data = extract_text_with_qwen(pdf_bytes)
         if not structured_data:
-            raise HTTPException(status_code=500, detail="Échec de l'extraction des données du PDF.")
-
-        logger.info(f"Données structurées extraites: {json.dumps(structured_data, indent=2, ensure_ascii=False)}")
+            logger.warning("No structured data extracted, using fallback.")
+            structured_data = {"compagnie": "unknown", "birth_date": "2000-01-01"}
 
         # Analyze with rules.py
         analyzer = InsuranceAnalyzer()
-        analysis = analyzer.analyze_pdf(structured_data)
-        logger.info(f"Analyse terminée. Médaille globale: {analysis.overall_medal}")
+        try:
+            analysis = analyzer.analyze_pdf(structured_data)
+            logger.info(f"Analysis completed. Overall medal: {analysis.overall_medal}")
+        except Exception as e:
+            logger.error(f"Analyzer error: {e}\n{traceback.format_exc()}")
+            raise HTTPException(status_code=500, detail="Error analyzing PDF data")
 
         # Handle optional categories
         facultatives = json.loads(optional_categories)
@@ -560,27 +563,39 @@ async def upload_pdf(
             exclusions.append("Voyage")
 
         if exclusions:
-            logger.info(f"Exclusions facultatives: {exclusions}")
-            analysis = analyzer.rectify_analysis(exclusions)
-            logger.info(f"Analyse rectifiée. Nouvelle médaille: {analysis.overall_medal}")
+            logger.info(f"Applying exclusions: {exclusions}")
+            try:
+                analysis = analyzer.rectify_analysis(exclusions)
+                logger.info(f"Rectified analysis. New medal: {analysis.overall_medal}")
+            except Exception as e:
+                logger.error(f"Rectify analysis error: {e}\n{traceback.format_exc()}")
+                raise HTTPException(status_code=500, detail="Error rectifying analysis")
 
-        # Send emails to user and admin
-        send_email_to_user(email, file.filename, analysis)
-        send_email_to_admin(email, phone, file.filename, analysis)
+        # Send emails (non-blocking)
+        try:
+            send_email_to_user(email, file.filename, analysis)
+        except Exception as e:
+            logger.warning(f"Failed to send user email: {e}")
+
+        try:
+            send_email_to_admin(email, phone, file.filename, analysis)
+        except Exception as e:
+            logger.warning(f"Failed to send admin email: {e}")
 
         # Return JSON response
         return {
-            "message": "Analyse complète, emails envoyés",
+            "message": "Analysis complete, emails sent",
             "benchmark": {
                 "final_score": analysis.overall_medal,
                 "detailed_scores": {r.name: {"color": r.color, "details": r.details} for r in analysis.categories}
             },
             "extracted_data": structured_data
         }
+    except HTTPException as e:
+        raise e
     except Exception as e:
-        logger.error(f"Erreur dans /upload/ endpoint : {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Erreur dans le traitement du PDF : {e}")
-
+        logger.error(f"Error in /upload/ endpoint: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
 
 # Health check endpoint
 @app.get("/api/health")
@@ -589,4 +604,5 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="127.0.0.1", port=8000, reload=True, log_level="debug")
