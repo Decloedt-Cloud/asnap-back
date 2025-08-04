@@ -27,7 +27,7 @@ SMTP_EMAIL = os.getenv("SMTP_EMAIL")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
 # Qwen API configuration
-QWEN_API_URL = "https://johnson-advancement-humanities-drops.trycloudflare.com/v1/chat/completions"
+QWEN_API_URL = "https://inserted-counted-commerce-executed.trycloudflare.com/v1/chat/completions"
 
 
 # Initialize FastAPI
